@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>音频分离实时推理</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f8f9fa;
+        }
+        
+        .title {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            color: #333;
+        }
+        
+        .key-container {
+            display: flex;
+            justify-content: space-around;
+            width: 80%;
+            max-width: 600px;
+        }
+        
+        .key {
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8rem;
+            font-weight: bold;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            margin: 0 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .key.l {
+            color: #fff;
+            background-color: #6c757d;
+        }
+        
+        .key.r {
+            color: #fff;
+            background-color: #6c757d;
+        }
+        
+        .key.active {
+            background-color: #28a745;
+            transform: scale(1.1);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .status {
+            margin-top: 2rem;
+            font-size: 1.2rem;
+            color: #495057;
+        }
+        
+        .instructions {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">音团分离实时推理demo</div>
+    
+    <div class="key-container">
+        <div id="key-l" class="key l">L</div>
+        <div id="key-r" class="key r">R</div>
+    </div>
+    
+    <div class="status">
+        当前播放: <span id="current-playback">原始音频</span>
+    </div>
+    
+    <div class="instructions">
+        <p>按下 <strong>L</strong> 键播放 左音团 音频</p>
+        <p>按下 <strong>R</strong> 键播放 右音团 音频</p>
+        <p>不按键时播放 原始音频</p>
+    </div>
+    
+    <script>
+        const socket = io();
+        
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+        
+        socket.on('key_update', (data) => {
+            const keyL = document.getElementById('key-l');
+            const keyR = document.getElementById('key-r');
+            
+            if (data.l) {
+                keyL.classList.add('active');
+            } else {
+                keyL.classList.remove('active');
+            }
+            
+            if (data.r) {
+                keyR.classList.add('active');
+            } else {
+                keyR.classList.remove('active');
+            }
+            
+            let playbackText = '原始音频';
+            if (data.l) playbackText = '左声道分离';
+            if (data.r) playbackText = '右声道分离';
+            document.getElementById('current-playback').textContent = playbackText;
+        });
+    </script>
+</body>
+</html> 
