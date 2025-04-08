@@ -5,7 +5,8 @@ import queue
 import time
 from app.audio_processor import preprocess_audio
 
-def inference_thread(model, device, audio_queue, output_queue, sample_rate, window_size, hop_size, is_running):
+def inference_thread(model, device, audio_queue, output_queue, sample_rate, window_size, hop_size, is_running, 
+                    volume_balance=False, momentum=0.9):
     """推理线程：处理音频队列中的数据并进行推理"""
     window_samples = int(window_size * sample_rate)
     hop_samples = int(hop_size * sample_rate)
@@ -25,7 +26,13 @@ def inference_thread(model, device, audio_queue, output_queue, sample_rate, wind
     frames_processed = 0
     frames_dropped = 0
     
+    # 初始化音量均衡参数
+    left_volume_ratio = 1.0
+    right_volume_ratio = 1.0
+    
     print(f"启动推理线程，窗口大小: {window_size}秒，步长: {hop_size}秒")
+    if volume_balance:
+        print(f"已启用音量均衡功能，动量参数: {momentum}")
     
     # 尝试预热模型
     print("预热模型...")
@@ -85,6 +92,29 @@ def inference_thread(model, device, audio_queue, output_queue, sample_rate, wind
                 
                 # 分离左右声道作为两个独立音频源
                 original_chunk = buffer[-hop_samples:]
+                
+                # 音量均衡处理
+                if volume_balance:
+                    # 计算原始音频左右声道的RMS音量
+                    original_left_rms = np.sqrt(np.mean(np.square(original_chunk[:, 0]))) + 1e-10
+                    original_right_rms = np.sqrt(np.mean(np.square(original_chunk[:, 1]))) + 1e-10
+                    
+                    # 计算分离音频的RMS音量
+                    separated_left_rms = np.sqrt(np.mean(np.square(output_chunk[:, 0]))) + 1e-10
+                    separated_right_rms = np.sqrt(np.mean(np.square(output_chunk[:, 1]))) + 1e-10
+                    
+                    # 计算音量比例
+                    current_left_ratio = original_left_rms / separated_left_rms if separated_left_rms > 1e-6 else 1.0
+                    current_right_ratio = original_right_rms / separated_right_rms if separated_right_rms > 1e-6 else 1.0
+                    
+                    # 使用动量更新音量比例
+                    left_volume_ratio = momentum * left_volume_ratio + (1 - momentum) * current_left_ratio
+                    right_volume_ratio = momentum * right_volume_ratio + (1 - momentum) * current_right_ratio
+                    
+                    # 应用音量均衡
+                    output_chunk[:, 0] = output_chunk[:, 0] * left_volume_ratio
+                    output_chunk[:, 1] = output_chunk[:, 1] * right_volume_ratio
+                
                 left_channel = np.column_stack((output_chunk[:, 0], np.zeros_like(output_chunk[:, 0])))
                 right_channel = np.column_stack((np.zeros_like(output_chunk[:, 1]), output_chunk[:, 1]))
                 
@@ -104,8 +134,13 @@ def inference_thread(model, device, audio_queue, output_queue, sample_rate, wind
                 # 每秒打印一次性能统计
                 current_time = time.time()
                 if current_time - last_print_time >= 1.0:
-                    print(f"推理性能统计 - 处理帧数: {frames_processed}, 丢弃帧数: {frames_dropped}, "
-                          f"队列大小: {queue_size}/{output_queue.maxsize}")
+                    stats = f"推理性能统计 - 处理帧数: {frames_processed}, 丢弃帧数: {frames_dropped}, " \
+                           f"队列大小: {queue_size}/{output_queue.maxsize}"
+                    
+                    if volume_balance:
+                        stats += f", 左声道音量比: {left_volume_ratio:.3f}, 右声道音量比: {right_volume_ratio:.3f}"
+                    
+                    print(stats)
                     frames_processed = 0
                     frames_dropped = 0
                     last_print_time = current_time

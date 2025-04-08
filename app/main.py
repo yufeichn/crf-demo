@@ -25,6 +25,8 @@ def main():
     parser.add_argument("--hop_size", type=float, default=0.2, help="窗口滑动步长（秒）")
     parser.add_argument("--port", type=int, default=5000, help="Web服务器端口")
     parser.add_argument("--buffer_size", type=int, default=20, help="音频缓冲区大小")
+    parser.add_argument("--volume_balance", action="store_true", help="启用音量均衡，使分离的声音与原始音频音量接近")
+    parser.add_argument("--momentum", type=float, default=0.9, help="音量均衡动量参数，越大音量变化越平滑（0-1之间）")
     
     args = parser.parse_args()
     
@@ -68,7 +70,8 @@ def main():
     # 启动推理线程
     inference_thread_handle = threading.Thread(
         target=inference_thread, 
-        args=(model, device, audio_queue, output_queue, sample_rate, args.window_size, args.hop_size, get_is_running),
+        args=(model, device, audio_queue, output_queue, sample_rate, args.window_size, 
+              args.hop_size, get_is_running, args.volume_balance, args.momentum),
         name="InferenceThread"
     )
     inference_thread_handle.daemon = True

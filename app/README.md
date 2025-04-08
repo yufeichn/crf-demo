@@ -77,13 +77,15 @@ python -m app.main --input_file samples/music.wav --model_path models/separation
 - `--hop_size <大小>`: 窗口滑动步长(秒)，默认为0.2。较小的值可使音频转换更平滑，但增加计算负担
 - `--port <端口号>`: Web服务器端口，默认为5000
 - `--buffer_size <大小>`: 音频缓冲区大小，默认为20。增大此值可提高播放流畅度，但会增加内存使用
+- `--volume_balance`: 启用音量均衡功能，使分离的声音与原始音频音量接近，解决切换时音量差异过大的问题
+- `--momentum <数值>`: 音量均衡动量参数，默认为0.9，值越大音量变化越平滑（取值范围0-1之间）
 - `--sample_rate <采样率>`: 音频采样率，默认为44100
 - `--device <设备>`: 指定PyTorch计算设备，如'cuda'或'cpu'，默认为'cpu'
 
 完整示例：
 
 ```bash
-python -m app.main --input_file samples/music.wav --model_path models/separation_model.pth --window_size 4.0 --hop_size 0.1 --buffer_size 30 --device cuda
+python -m app.main --input_file samples/music.wav --model_path models/separation_model.pth --window_size 4.0 --hop_size 0.1 --buffer_size 30 --device cuda --volume_balance --momentum 0.85
 ```
 
 ### 使用界面
@@ -119,6 +121,14 @@ python -m app.keyboard_test
 - 增大 `--window_size` 参数值（如：4.0-5.0）
 - 检查计算机性能，确保CPU能够实时处理音频
 - 尝试使用GPU进行推理（设置 `--device cuda`）
+
+### 音频源切换时音量差异大
+
+- 使用 `--volume_balance` 参数启用音量均衡功能
+- 调整 `--momentum` 参数（0.7-0.95之间）以平衡响应速度和平滑度：
+  - 值越大（如0.95）：音量变化更平滑，但响应较慢
+  - 值越小（如0.7）：响应更快，但可能有轻微波动
+- 确保分离模型训练充分，输出质量较高
 
 ### 网页界面无法连接
 
