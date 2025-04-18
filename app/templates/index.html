@@ -10,119 +10,103 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: #f8f9fa;
+            min-height: 100vh;
+            background-image: url('/static/bg.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
         }
         
         .title {
+            position: absolute;
+            top: 5%;
+            left: 5%;
             font-size: 2rem;
             font-weight: bold;
-            margin-bottom: 2rem;
-            color: #333;
-        }
-        
-        .key-container {
-            display: flex;
-            justify-content: space-around;
-            width: 80%;
-            max-width: 600px;
-        }
-        
-        .key {
-            width: 200px;
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 8rem;
-            font-weight: bold;
-            border-radius: 20px;
-            transition: all 0.3s ease;
-            margin: 0 20px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-        
-        .key.l {
-            color: #fff;
-            background-color: #6c757d;
-        }
-        
-        .key.r {
-            color: #fff;
-            background-color: #6c757d;
-        }
-        
-        .key.active {
-            background-color: #28a745;
-            transform: scale(1.1);
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            color: #000;
+            z-index: 20;
         }
         
         .status {
-            margin-top: 2rem;
-            font-size: 1.2rem;
-            color: #495057;
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 3.5rem;
+            color: #f00;
+            z-index: 20;
+            text-align: center;
+            font-weight: bold;
         }
         
         .instructions {
-            margin-top: 2rem;
-            padding: 1rem;
-            background-color: #e9ecef;
-            border-radius: 10px;
-            width: 80%;
-            max-width: 600px;
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.3rem;
+            color: #fff;
+            z-index: 20;
             text-align: center;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 0.5rem 1.5rem;
+            border-radius: 10px;
         }
     </style>
 </head>
 <body>
+    <img id="left-overlay" class="overlay" src="/static/left.png" alt="Left Channel">
+    <img id="right-overlay" class="overlay" src="/static/right.png" alt="Right Channel">
+    
     <div class="title">音团分离实时推理demo</div>
     
-    <div class="key-container">
-        <div id="key-l" class="key l">L</div>
-        <div id="key-r" class="key r">R</div>
-    </div>
-    
     <div class="status">
-        当前播放: <span id="current-playback">原始音频</span>
+        My attention is on <span id="current-playback">All regions.</span>
     </div>
     
     <div class="instructions">
-        <p>按下 <strong>L</strong> 键播放 左音团 音频</p>
-        <p>按下 <strong>R</strong> 键播放 右音团 音频</p>
-        <p>不按键时播放 原始音频</p>
+        Press <strong>L</strong> for Region 3 separation | Press <strong>R</strong> for Region 4 separation | Play original audio when no key is pressed
     </div>
     
     <script>
         const socket = io();
+        const leftOverlay = document.getElementById('left-overlay');
+        const rightOverlay = document.getElementById('right-overlay');
         
         socket.on('connect', () => {
             console.log('Connected to server');
         });
         
         socket.on('key_update', (data) => {
-            const keyL = document.getElementById('key-l');
-            const keyR = document.getElementById('key-r');
-            
             if (data.l) {
-                keyL.classList.add('active');
+                leftOverlay.style.opacity = '1';
             } else {
-                keyL.classList.remove('active');
+                leftOverlay.style.opacity = '0';
             }
             
             if (data.r) {
-                keyR.classList.add('active');
+                rightOverlay.style.opacity = '1';
             } else {
-                keyR.classList.remove('active');
+                rightOverlay.style.opacity = '0';
             }
             
-            let playbackText = '原始音频';
-            if (data.l) playbackText = '左声道分离';
-            if (data.r) playbackText = '右声道分离';
+            let playbackText = 'All regions.';
+            if (data.l) playbackText = 'Region 3.';
+            if (data.r) playbackText = 'Region 4.';
             document.getElementById('current-playback').textContent = playbackText;
         });
     </script>

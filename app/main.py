@@ -14,6 +14,8 @@ from app.inference_processor import inference_thread
 from app.audio_player import audio_playback_thread
 from app.keyboard_listener import KeyboardHandler
 from app.web_server import create_web_server
+from app.model_input_handler import ModelInputHandler
+from app.calibration_processor import CalibrationProcessor
 
 def main():
     """主程序入口"""
@@ -27,6 +29,10 @@ def main():
     parser.add_argument("--buffer_size", type=int, default=20, help="音频缓冲区大小")
     parser.add_argument("--volume_balance", action="store_true", help="启用音量均衡，使分离的声音与原始音频音量接近")
     parser.add_argument("--momentum", type=float, default=0.9, help="音量均衡动量参数，越大音量变化越平滑（0-1之间）")
+    parser.add_argument("--input_mode", type=str, choices=["keyboard", "eeg"], default="keyboard", 
+                        help="选择输入模式：keyboard（键盘）或eeg（脑电）")
+    parser.add_argument("--eeg_data_dir", type=str, default="./eeg_utils", 
+                        help="EEG数据目录，包含X_train.npy、Y_train.npy、X_test.npy和Y_test.npy文件")
     
     args = parser.parse_args()
     
@@ -44,11 +50,28 @@ def main():
     # 创建Web服务器
     app, socketio = create_web_server()
     
-    # 创建键盘处理器
-    keyboard_handler = KeyboardHandler(socketio)
+    # 定义当前使用的输入处理器
+    input_handler = None
+    calibration_processor = None
     
-    # 启动键盘监听
-    keyboard_listener = keyboard_handler.start()
+    # 根据输入模式选择不同的输入处理器
+    if args.input_mode == "keyboard":
+        print("使用键盘输入模式")
+        # 创建键盘处理器
+        input_handler = KeyboardHandler(socketio)
+        # 启动键盘监听
+        keyboard_listener = input_handler.start()
+    else:  # eeg 模式
+        print("使用脑电输入模式")
+        # 创建模型输入处理器
+        model_input_handler = ModelInputHandler(socketio)
+        input_handler = model_input_handler  # 设置为主输入处理器
+        # 启动模型输入处理
+        model_input_listener = model_input_handler.start()
+        
+        # 创建并启动校准模型处理器
+        calibration_processor = CalibrationProcessor(model_input_handler)
+        calibration_processor.start(args.eeg_data_dir)
     
     # 定义is_running函数
     def get_is_running():
@@ -56,13 +79,13 @@ def main():
     
     # 定义获取当前频道的函数
     def get_current_channel():
-        return keyboard_handler.get_current_channel()
+        return input_handler.get_current_channel()
     
     # 添加WebSocket连接事件处理
     @socketio.on('connect')
     def handle_connect():
         """WebSocket连接事件"""
-        key_status = keyboard_handler.get_key_status()
+        key_status = input_handler.get_key_status()
         socketio.emit('key_update', {'l': key_status["l"], 'r': key_status["r"]})
     
     print(f"程序启动，正在初始化组件...")
@@ -106,7 +129,9 @@ def main():
         print("程序被用户中断")
     finally:
         is_running = False
-        keyboard_handler.stop()
+        input_handler.stop()
+        if calibration_processor:
+            calibration_processor.stop()
         print("程序已停止")
 
 if __name__ == "__main__":

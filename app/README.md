@@ -1,6 +1,6 @@
 # 音频分离实时演示系统
 
-这是一个专为音频源分离设计的实时推理演示应用程序。该应用允许用户通过网页界面直观地展示分离效果，并能够通过键盘按键实时切换播放不同的分离结果，方便用户对比原始音频与分离后的效果差异。
+这是一个专为音频源分离设计的实时推理演示应用程序。该应用允许用户通过网页界面直观地展示分离效果，并能够通过键盘按键或脑电信号实时切换播放不同的分离结果，方便用户对比原始音频与分离后的效果差异。
 
 ## 功能特点
 
@@ -11,6 +11,9 @@
   - 按住'L'键播放左声道分离结果
   - 按住'R'键播放右声道分离结果
   - 不按任何键时自动播放原始立体声音频
+- **多种输入方式**：
+  - 键盘输入模式：通过按键'L'和'R'控制注意力方向
+  - 脑电输入模式：通过脑电信号自动控制注意力方向
 - **可配置参数**：支持多种参数调整，以适应不同性能设备和应用场景
 
 ## 系统要求
@@ -29,6 +32,8 @@
 - **SoundDevice** (>=0.4.0)：音频播放
 - **pynput** (>=1.7.0)：键盘监听
 - **NumPy** (>=1.19.0)：数值计算
+- **scikit-learn** (==1.3.0)：用于脑电模型（仅在使用脑电输入模式时需要）
+- **pyriemann** (==0.7)：用于脑电数据处理（仅在使用脑电输入模式时需要）
 
 ## 安装指南
 
@@ -42,7 +47,11 @@ cd crf-demo
 2. 安装所需依赖：
 
 ```bash
+# 基础依赖
 pip install torch flask flask-socketio soundfile sounddevice pynput numpy
+
+# 如果需要使用脑电输入模式，还需安装以下依赖
+pip install scikit-learn pyriemann
 ```
 
 或者使用 requirements.txt：
@@ -59,15 +68,29 @@ pip install -r requirements.txt
 
 ```bash
 python -m app.main --input_file <音频文件路径> --model_path <模型权重文件路径>
-# 把上面括号内填入真实路径即可
-python -m app.main --input_file ../test_tse/stereo/sample_0010.wav  --model_path app/checkpoints/best_model.pth
 ```
 
 示例：
 
 ```bash
-python -m app.main --input_file samples/music.wav --model_path models/separation_model.pth
+python -m app.main --input_file ../test_tse/stereo/sample_0010.wav  --model_path app/checkpoints/best_model.pth
 ```
+
+### 输入模式选择
+
+应用支持两种输入模式来控制音频注意力方向：
+
+1. **键盘输入模式**（默认）：
+   ```bash
+   python -m app.main --input_file <音频文件路径> --model_path <模型权重路径>
+   ```
+   
+2. **脑电输入模式**：
+   ```bash
+   python -m app.main --input_file <音频文件路径> --model_path <模型权重路径> --input_mode eeg
+   ```
+   
+   > 注意：使用脑电输入模式需要准备好相应的数据文件。详细说明请参阅 [脑电输入模式使用说明](app/README_EEG.md)。
 
 ### 高级配置参数
 
@@ -79,23 +102,34 @@ python -m app.main --input_file samples/music.wav --model_path models/separation
 - `--buffer_size <大小>`: 音频缓冲区大小，默认为20。增大此值可提高播放流畅度，但会增加内存使用
 - `--volume_balance`: 启用音量均衡功能，使分离的声音与原始音频音量接近，解决切换时音量差异过大的问题
 - `--momentum <数值>`: 音量均衡动量参数，默认为0.9，值越大音量变化越平滑（取值范围0-1之间）
-- `--sample_rate <采样率>`: 音频采样率，默认为44100
-- `--device <设备>`: 指定PyTorch计算设备，如'cuda'或'cpu'，默认为'cpu'
+- `--input_mode <模式>`: 选择输入模式，可选"keyboard"或"eeg"，默认为"keyboard"
+- `--eeg_data_dir <目录>`: EEG数据目录，默认为"./eeg_utils"，仅在使用脑电输入模式时有效
 
 完整示例：
 
 ```bash
-python -m app.main --input_file samples/music.wav --model_path models/separation_model.pth --window_size 4.0 --hop_size 0.1 --buffer_size 30 --device cuda --volume_balance --momentum 0.85
+python -m app.main --input_file samples/music.wav --model_path models/separation_model.pth --window_size 4.0 --hop_size 0.1 --buffer_size 30 --volume_balance --momentum 0.85
+```
+
+使用脑电输入的示例：
+
+```bash
+python -m app.main --input_file samples/music.wav --model_path models/separation_model.pth --input_mode eeg --eeg_data_dir ./custom_eeg_data
 ```
 
 ### 使用界面
 
 1. 启动应用后，在浏览器中访问 `http://localhost:5000`（或您指定的端口）
 2. 网页界面将显示当前播放状态和按键状态
-3. 使用键盘进行交互：
-   - 按住 `L` 键：播放左声道分离结果
-   - 按住 `R` 键：播放右声道分离结果
-   - 不按任何键：播放原始立体声音频
+3. 根据所选输入模式进行交互：
+   - **键盘输入模式**：
+     - 按住 `L` 键：播放左声道分离结果
+     - 按住 `R` 键：播放右声道分离结果
+     - 不按任何键：播放原始立体声音频
+   - **脑电输入模式**：
+     - 系统自动根据脑电信号预测用户注意力方向
+     - 预测结果为左侧：播放左声道分离结果
+     - 预测结果为右侧：播放右声道分离结果
 4. 界面将实时更新，显示当前播放的音频类型
 
 ## macOS 特别说明
@@ -143,6 +177,14 @@ python -m app.keyboard_test
 - 重启应用程序或终端
 - 在 macOS 上运行键盘测试脚本确认权限设置正确
 
+### 脑电输入模式问题
+
+- 确保数据文件已正确放置在指定目录中
+- 检查控制台输出查找潜在的错误信息
+- 确认文件名大小写正确
+- 尝试使用绝对路径指定数据目录
+- 详细排错信息请参阅 [脑电输入模式使用说明](app/README_EEG.md)
+
 ## 项目结构
 
 - `main.py`: 主程序入口，解析命令行参数并初始化各组件
@@ -151,9 +193,12 @@ python -m app.keyboard_test
 - `inference_processor.py`: 执行模型推理，将音频分离为不同声道
 - `audio_player.py`: 管理音频播放，处理实时切换逻辑
 - `keyboard_listener.py`: 监听键盘输入，捕获用户交互
+- `model_input_handler.py`: 处理脑电模型的输入，模拟按键事件
+- `calibration_processor.py`: 运行脑电校准模型，生成预测结果
 - `web_server.py`: 提供Web服务器功能，包括Socket通信
 - `templates/index.html`: 网页前端界面模板
 - `static/`: 存放CSS、JavaScript等静态资源
+- `eeg_utils/`: 包含脑电信号处理相关代码和模型
 
 ## 贡献指南
 
