@@ -6,7 +6,7 @@ import time
 from app.audio_processor import preprocess_audio
 
 def inference_thread(model, device, audio_queue, output_queue, sample_rate, window_size, hop_size, is_running, 
-                    volume_balance=False, momentum=0.9):
+                    volume_balance=False, momentum=0.9, relative_volume=0.0):
     """推理线程：处理音频队列中的数据并进行推理"""
     window_samples = int(window_size * sample_rate)
     hop_samples = int(hop_size * sample_rate)
@@ -115,15 +115,24 @@ def inference_thread(model, device, audio_queue, output_queue, sample_rate, wind
                     output_chunk[:, 0] = output_chunk[:, 0] * left_volume_ratio
                     output_chunk[:, 1] = output_chunk[:, 1] * right_volume_ratio
                 
-                left_channel = np.column_stack((output_chunk[:, 0], np.zeros_like(output_chunk[:, 0])))
-                right_channel = np.column_stack((np.zeros_like(output_chunk[:, 1]), output_chunk[:, 1]))
+                # 根据 relative_volume 决定如何构造左右声道的输出
+                if relative_volume == 0.0:
+                    # 保持现有逻辑：非注意侧静音
+                    left_channel_out = np.column_stack((output_chunk[:, 0], np.zeros_like(output_chunk[:, 0])))
+                    right_channel_out = np.column_stack((np.zeros_like(output_chunk[:, 1]), output_chunk[:, 1]))
+                else:
+                    # 新逻辑：非注意侧以 relative_volume 播放
+                    # "左注意" 时播放的音频：左声道完整，右声道乘以 relative_volume
+                    left_channel_out = np.column_stack((output_chunk[:, 0], output_chunk[:, 1] * relative_volume))
+                    # "右注意" 时播放的音频：右声道完整，左声道乘以 relative_volume
+                    right_channel_out = np.column_stack((output_chunk[:, 0] * relative_volume, output_chunk[:, 1]))
                 
                 # 避免输出队列阻塞
                 try:
                     output_queue.put({
                         "original": original_chunk.copy(),
-                        "left": left_channel.copy(),
-                        "right": right_channel.copy()
+                        "left": left_channel_out.copy(),
+                        "right": right_channel_out.copy()
                     }, timeout=0.1)
                     frames_processed += 1
                 except queue.Full:

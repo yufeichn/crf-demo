@@ -54,3 +54,41 @@ class AudioUNet(nn.Module):
         # Final output
         out = self.final(dec1)
         return out 
+
+if __name__ == "__main__":
+    import time
+
+    # 设定测试参数
+    device = torch.device("cpu") # 或者 torch.device("cuda") 如果有GPU
+    # 模拟一个输入片段，例如3秒，16000Hz采样率
+    # batch_size=1, channels=2, sequence_length=3*16000
+    dummy_input = torch.randn(1, 2, 3 * 16000).to(device)
+    num_runs = 100 # 测试运行次数
+
+    # 实例化模型
+    model = AudioUNet().to(device)
+    model.eval() # 设置为评估模式
+
+    # 1. 计算参数量
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"模型可训练参数数量: {total_params:,}")
+
+    # 2. 测试推理延迟
+    # 热身运行
+    with torch.no_grad():
+        _ = model(dummy_input)
+
+    # 多次运行计时
+    start_time = time.time()
+    with torch.no_grad():
+        for _ in range(num_runs):
+            _ = model(dummy_input)
+    end_time = time.time()
+
+    total_time = end_time - start_time
+    avg_latency_ms = (total_time / num_runs) * 1000
+
+    print(f"设备: {device}")
+    print(f"输入尺寸: {list(dummy_input.shape)}")
+    print(f"运行次数: {num_runs}")
+    print(f"平均推理延迟: {avg_latency_ms:.3f} ms") 

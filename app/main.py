@@ -26,15 +26,21 @@ def main():
     parser.add_argument("--window_size", type=float, default=3.0, help="滑动窗口大小（秒）")
     parser.add_argument("--hop_size", type=float, default=0.2, help="窗口滑动步长（秒）")
     parser.add_argument("--port", type=int, default=5000, help="Web服务器端口")
-    parser.add_argument("--buffer_size", type=int, default=20, help="音频缓冲区大小")
+    parser.add_argument("--buffer_size", type=int, default=5, help="音频缓冲区大小（队列长度），影响延迟，建议 5-10")
     parser.add_argument("--volume_balance", action="store_true", help="启用音量均衡，使分离的声音与原始音频音量接近")
     parser.add_argument("--momentum", type=float, default=0.9, help="音量均衡动量参数，越大音量变化越平滑（0-1之间）")
     parser.add_argument("--input_mode", type=str, choices=["keyboard", "eeg"], default="keyboard", 
                         help="选择输入模式：keyboard（键盘）或eeg（脑电）")
     parser.add_argument("--eeg_data_dir", type=str, default="./eeg_utils", 
                         help="EEG数据目录，包含X_train.npy、Y_train.npy、X_test.npy和Y_test.npy文件")
+    parser.add_argument("--relative-volume", type=float, default=0.0, 
+                        help="非注意声道的相对音量（0.0 到 1.0 之间）。0.0 表示静音（旧模式），大于 0 表示两侧都有声音。")
     
     args = parser.parse_args()
+    
+    # 校验 relative_volume 参数范围
+    if not (0.0 <= args.relative_volume <= 1.0):
+        parser.error("--relative-volume 必须在 0.0 和 1.0 之间")
     
     # 全局变量
     audio_queue = queue.Queue(maxsize=args.buffer_size)
@@ -94,7 +100,7 @@ def main():
     inference_thread_handle = threading.Thread(
         target=inference_thread, 
         args=(model, device, audio_queue, output_queue, sample_rate, args.window_size, 
-              args.hop_size, get_is_running, args.volume_balance, args.momentum),
+              args.hop_size, get_is_running, args.volume_balance, args.momentum, args.relative_volume),
         name="InferenceThread"
     )
     inference_thread_handle.daemon = True

@@ -53,7 +53,9 @@ def audio_playback_thread(output_queue, current_channel, sample_rate, is_running
     
     # 打开音频流
     with sd.OutputStream(samplerate=sample_rate, channels=2, 
-                         callback=audio_callback, blocksize=int(0.1 * sample_rate)):
+                         callback=audio_callback, 
+                         blocksize=int(0.1 * sample_rate), 
+                         latency='low'):
         while is_running():
             try:
                 current_ch = current_channel()
